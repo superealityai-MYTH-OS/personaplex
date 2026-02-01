@@ -10,6 +10,8 @@ name: Sync with Upstream
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to push changes to the repository
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
