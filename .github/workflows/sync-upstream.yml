@@ -1,0 +1,59 @@
+---
+name: Sync with Upstream
+
+"on":
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to push changes to the repository
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: |
+          if ! git remote get-url upstream >/dev/null 2>&1; then
+            git remote add upstream \
+              https://github.com/NVIDIA/personaplex.git
+          fi
+          git remote -v
+
+      - name: Fetch upstream changes
+        run: git fetch upstream main
+
+      - name: Check for upstream changes
+        id: check_changes
+        run: |
+          BEHIND=$(git rev-list --count HEAD..upstream/main)
+          echo "behind=$BEHIND" >> $GITHUB_OUTPUT
+          if [ "$BEHIND" -gt 0 ]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "Fork is $BEHIND commits behind upstream"
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "Fork is up to date with upstream"
+          fi
+
+      - name: Merge upstream changes
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          git merge upstream/main --no-edit \
+            -m "Merge upstream changes from NVIDIA/personaplex"
+
+      - name: Push changes
+        if: steps.check_changes.outputs.changes == 'true'
+        run: git push origin main
