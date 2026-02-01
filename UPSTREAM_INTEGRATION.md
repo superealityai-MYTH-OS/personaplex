@@ -44,7 +44,7 @@ To manually sync with upstream, you can:
 
 This repository is configured with two remotes:
 - `origin`: Points to this fork (superealityai-MYTH-OS/personaplex)
-- `nvidia`: Points to the upstream repository (NVIDIA/personaplex)
+- `upstream`: Points to the upstream repository (NVIDIA/personaplex) - used by the sync workflow
 
 You can verify this with:
 ```bash

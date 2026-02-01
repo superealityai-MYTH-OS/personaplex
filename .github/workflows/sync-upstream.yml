@@ -24,8 +24,10 @@ jobs:
 
       - name: Add upstream remote
         run: |
-          git remote add upstream \
-            https://github.com/NVIDIA/personaplex.git || true
+          if ! git remote get-url upstream >/dev/null 2>&1; then
+            git remote add upstream \
+              https://github.com/NVIDIA/personaplex.git
+          fi
           git remote -v
 
       - name: Fetch upstream changes
