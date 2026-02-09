@@ -7,6 +7,12 @@ import { Button } from "../../components/Button/Button";
 import { useModelParams } from "../Conversation/hooks/useModelParams";
 import { env } from "../../env";
 import { prewarmDecoderWorker } from "../../decoder/decoderWorker";
+import {
+  checkGovernanceGate,
+  createAuditTrail,
+  ClicksVector,
+  PrzState,
+} from "../../prz/governance";
 
 const VOICE_OPTIONS = [
   "NATF0.pt", "NATF1.pt", "NATF2.pt", "NATF3.pt",
@@ -132,6 +138,9 @@ export const Queue:FC = () => {
   const [hasMicrophoneAccess, setHasMicrophoneAccess] = useState<boolean>(false);
   const [showMicrophoneAccessMessage, setShowMicrophoneAccessMessage] = useState<boolean>(false);
   const modelParams = useModelParams();
+  const przState = useRef<PrzState>("vapor");
+  const loopCount = useRef<number>(0);
+  const auditTrail = useRef(createAuditTrail());
 
   const audioContext = useRef<AudioContext | null>(null);
   const worklet = useRef<AudioWorkletNode | null>(null);
@@ -183,9 +192,36 @@ export const Queue:FC = () => {
   }, [audioContext, worklet]);
 
   const startConnection = useCallback(async() => {
-      await startProcessor();
-      const hasAccess = await getMicrophoneAccess();
-      if (hasAccess) {
+    loopCount.current += 1;
+    const clicksVector: ClicksVector = {
+      direction: "toward",
+      magnitude: 0.9,
+      frequency: 0.85,
+    };
+    // Never execute automations without checking governance gates.
+    const gateResult = checkGovernanceGate({
+      automationName: "start-connection",
+      userApproved: true,
+      currentState: przState.current,
+      clicksVector,
+      loopCount: loopCount.current,
+    });
+    auditTrail.current.logTransition(gateResult.auditEntry);
+    przState.current = gateResult.nextState;
+
+    if (!gateResult.allowed) {
+      if (gateResult.message) {
+        console.info(gateResult.message);
+      }
+      return;
+    }
+    if (gateResult.pivotSuggested && gateResult.message) {
+      console.info(gateResult.message);
+    }
+
+    await startProcessor();
+    const hasAccess = await getMicrophoneAccess();
+    if (hasAccess) {
       // Values are already set in modelParams, they get passed to Conversation
     }
   }, [startProcessor, getMicrophoneAccess]);
